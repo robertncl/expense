@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StatusBar, Dimensions, ScrollView } from 'expo-status-bar';
 import { StyleSheet, Text, View, TextInput, Button, FlatList, TouchableOpacity, Modal, Pressable } from 'react-native';
-import { PieChart } from 'react-native-chart-kit';
+import { PieChart, LineChart } from 'react-native-chart-kit';
 
 const categories = ['Food', 'Transport', 'Shopping', 'Bills', 'Other'];
 
@@ -65,6 +65,16 @@ export default function App() {
     };
   }).filter(d => d.amount > 0);
 
+  // Prepare data for trend chart
+  const dateTotals = {};
+  expenses.forEach(e => {
+    if (!dateTotals[e.date]) dateTotals[e.date] = 0;
+    dateTotals[e.date] += e.amount;
+  });
+  const sortedDates = Object.keys(dateTotals).sort();
+  const trendDates = sortedDates.slice(-7); // last 7 days
+  const trendData = trendDates.map(d => dateTotals[d]);
+
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.container}>
       <Text style={styles.title}>Expense Tracker</Text>
@@ -93,6 +103,32 @@ export default function App() {
           />
         ) : (
           <Text style={{ textAlign: 'center', color: '#888' }}>No data for chart.</Text>
+        )}
+        <Text style={{ marginTop: 18, fontWeight: 'bold' }}>Trend (Last {trendDates.length} Days)</Text>
+        {trendDates.length > 0 ? (
+          <LineChart
+            data={{
+              labels: trendDates,
+              datasets: [{ data: trendData }],
+            }}
+            width={Dimensions.get('window').width - 40}
+            height={180}
+            yAxisLabel="$"
+            chartConfig={{
+              backgroundColor: '#fff',
+              backgroundGradientFrom: '#fff',
+              backgroundGradientTo: '#fff',
+              decimalPlaces: 2,
+              color: (opacity = 1) => `rgba(33, 150, 243, ${opacity})`,
+              labelColor: () => '#333',
+              style: { borderRadius: 8 },
+              propsForDots: { r: '4', strokeWidth: '2', stroke: '#2196f3' },
+            }}
+            bezier
+            style={{ marginVertical: 8, borderRadius: 8 }}
+          />
+        ) : (
+          <Text style={{ textAlign: 'center', color: '#888' }}>No trend data.</Text>
         )}
       </View>
       <View style={styles.filterRow}>
