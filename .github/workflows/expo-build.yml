@@ -21,26 +21,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Expo CLI
-        run: npm install -g expo-cli
+      - name: Install Expo CLI and EAS CLI
+        run: npm install -g expo-cli eas-cli
 
-      - name: Build Android app
+      - name: Expo GitHub Action (for caching)
         uses: expo/expo-github-action@v8
         with:
           expo-version: latest
           eas-version: latest
-          eas-token: ${{ secrets.EXPO_TOKEN }}
-          command: eas build --platform android --non-interactive --output=android-build
+
+      - name: Build Android app
+        run: eas build --platform android --non-interactive --output=android-build
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
       - name: Build iOS app
-        uses: expo/expo-github-action@v8
-        with:
-          expo-version: latest
-          eas-version: latest
-          eas-token: ${{ secrets.EXPO_TOKEN }}
-          command: eas build --platform ios --non-interactive --output=ios-build
+        run: eas build --platform ios --non-interactive --output=ios-build
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
