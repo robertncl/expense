@@ -24,6 +24,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "98e2e389-85f1-4f5d-a14b-bcc0c7ad9e76"
+      }
+    },
+    "owner": "robertncl"
   }
 }
