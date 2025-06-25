@@ -31,23 +31,11 @@ jobs:
           eas-version: latest
 
       - name: Build Android app
-        run: eas build --platform android --non-interactive --output=android-build
+        run: eas build --platform android --non-interactive
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
       - name: Build iOS app
-        run: eas build --platform ios --non-interactive --output=ios-build
+        run: eas build --platform ios --non-interactive
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-
-      - name: Upload Android build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-app
-          path: ./android-build
-
-      - name: Upload iOS build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-app
-          path: ./ios-build 
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }} 
