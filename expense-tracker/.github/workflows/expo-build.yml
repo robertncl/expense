@@ -1,0 +1,57 @@
+name: Build Expo App (iOS & Android)
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: cd expense-tracker && npm ci
+
+      - name: Install Expo CLI
+        run: npm install -g expo-cli
+
+      - name: Build Android app
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          eas-token: ${{ secrets.EXPO_TOKEN }}
+          command: cd expense-tracker && eas build --platform android --non-interactive --output=android-build
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build iOS app
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          eas-token: ${{ secrets.EXPO_TOKEN }}
+          command: cd expense-tracker && eas build --platform ios --non-interactive --output=ios-build
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Upload Android build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-app
+          path: ./expense-tracker/android-build
+
+      - name: Upload iOS build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-app
+          path: ./expense-tracker/ios-build 
