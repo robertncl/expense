@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { StatusBar } from 'expo-status-bar';
+import { StatusBar, Dimensions, ScrollView } from 'expo-status-bar';
 import { StyleSheet, Text, View, TextInput, Button, FlatList, TouchableOpacity, Modal, Pressable } from 'react-native';
+import { PieChart } from 'react-native-chart-kit';
 
 const categories = ['Food', 'Transport', 'Shopping', 'Bills', 'Other'];
 
@@ -52,9 +53,48 @@ export default function App() {
     (!filterDate || exp.date === filterDate)
   );
 
+  const totalSpent = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const categoryData = categories.map(cat => {
+    const value = expenses.filter(e => e.category === cat).reduce((sum, e) => sum + e.amount, 0);
+    return {
+      name: cat,
+      amount: value,
+      color: ['#4fc3f7', '#81c784', '#ffb74d', '#e57373', '#ba68c8'][categories.indexOf(cat)],
+      legendFontColor: '#333',
+      legendFontSize: 14,
+    };
+  }).filter(d => d.amount > 0);
+
   return (
-    <View style={styles.container}>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.container}>
       <Text style={styles.title}>Expense Tracker</Text>
+      <View style={styles.analyticsBox}>
+        <Text style={styles.analyticsTitle}>Analytics</Text>
+        <Text style={styles.analyticsTotal}>Total Spent: ${totalSpent.toFixed(2)}</Text>
+        {categoryData.length > 0 ? (
+          <PieChart
+            data={categoryData.map(d => ({
+              name: d.name,
+              population: d.amount,
+              color: d.color,
+              legendFontColor: d.legendFontColor,
+              legendFontSize: d.legendFontSize,
+            }))}
+            width={Dimensions.get('window').width - 40}
+            height={180}
+            chartConfig={{
+              color: (opacity = 1) => `rgba(33, 150, 243, ${opacity})`,
+              labelColor: () => '#333',
+            }}
+            accessor="population"
+            backgroundColor="transparent"
+            paddingLeft="10"
+            absolute
+          />
+        ) : (
+          <Text style={{ textAlign: 'center', color: '#888' }}>No data for chart.</Text>
+        )}
+      </View>
       <View style={styles.filterRow}>
         <Text>Category:</Text>
         <FlatList
@@ -117,12 +157,12 @@ export default function App() {
         </View>
       </Modal>
       <StatusBar style="auto" />
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f8f8', paddingTop: 50, paddingHorizontal: 10 },
+  container: { flexGrow: 1, backgroundColor: '#f8f8f8', paddingTop: 50, paddingHorizontal: 10 },
   title: { fontSize: 28, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' },
   filterRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   catBtn: { padding: 6, marginHorizontal: 2, borderRadius: 8, backgroundColor: '#eee' },
@@ -138,4 +178,7 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' },
   catRow: { flexDirection: 'row', flexWrap: 'wrap', marginVertical: 8 },
   modalActions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
+  analyticsBox: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16, elevation: 2 },
+  analyticsTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 6 },
+  analyticsTotal: { fontSize: 16, marginBottom: 10 },
 });
