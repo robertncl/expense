@@ -27,7 +27,7 @@
     },
     "postcss": {
       ".": "8.5.26",
-      "nanoid": "3.3.17"
+      "nanoid": "3.3.18"
     },
     "react-devtools-core": {
       "shell-quote": "1.10.0"
