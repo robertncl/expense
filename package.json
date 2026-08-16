@@ -31,7 +31,8 @@
     },
     "react-devtools-core": {
       "shell-quote": "1.10.0"
-    }
+    },
+    "uuid@7.0.3": "14.0.1"
   },
   "private": true
 }
