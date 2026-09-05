@@ -9,14 +9,14 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "expo": "53.0.27",
-    "expo-status-bar": "~2.2.3",
+    "expo": "57.0.20",
+    "expo-status-bar": "57.0.1",
     "react": "19.2.8",
-    "react-native": "0.79.7",
-    "react-native-chart-kit": "^6.12.3"
+    "react-native": "1000.0.0",
+    "react-native-chart-kit": "7.0.2"
   },
   "devDependencies": {
-    "@babel/core": "^7.29.7"
+    "@babel/core": "8.0.1"
   },
   "overrides": {
     "@expo/cli": {
