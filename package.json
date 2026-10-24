@@ -9,7 +9,7 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "expo": "58.0.2",
+    "expo": "58.0.19",
     "expo-splash-screen": "58.0.11",
     "expo-status-bar": "58.0.4",
     "react": "19.3.0",
@@ -22,20 +22,17 @@
   },
   "overrides": {
     "browserslist": {
-      "caniuse-lite": "1.0.30001814"
+      "caniuse-lite": "1.0.30001819"
     },
     "postcss": {
-      ".": "8.5.28",
-      "nanoid": "3.3.19"
+      ".": "8.5.31",
+      "nanoid": "3.3.20"
     },
     "react-devtools-core": {
-      "shell-quote": "1.11.0"
+      "shell-quote": "1.12.0"
     },
     "react-native-chart-kit": {
       "react-native": "$react-native"
-    },
-    "xcode": {
-      "uuid": "11.1.1"
     }
   },
   "private": true
