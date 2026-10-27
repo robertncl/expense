@@ -14,6 +14,16 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
+import {
+  languages,
+  languageByCode,
+  strings,
+  detectLanguage,
+  makeFormatters,
+  normalizeDigits,
+  parseAmount,
+  allowsLetterSpacing,
+} from './i18n';
 
 const categories = [
   { name: 'Food', icon: '🍔', color: '#F97316' },
@@ -57,14 +67,20 @@ const todayISO = () => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
-const formatMoney = n => `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
 export default function App() {
   const scheme = useColorScheme();
   const t = themes[scheme === 'dark' ? 'dark' : 'light'];
-  const styles = useMemo(() => makeStyles(t), [t]);
+  const [lang, setLang] = useState(detectLanguage);
+  const rtl = !!languageByCode[lang].rtl;
+  const s = useMemo(() => ({ ...strings.en, ...strings[lang] }), [lang]);
+  const fmt = useMemo(() => makeFormatters(lang), [lang]);
+  const styles = useMemo(
+    () => makeStyles(t, { rtl, letterSpacing: allowsLetterSpacing(lang) }),
+    [t, rtl, lang],
+  );
   const { width } = useWindowDimensions();
 
+  const [langPickerVisible, setLangPickerVisible] = useState(false);
   const [expenses, setExpenses] = useState([]);
   const [desc, setDesc] = useState('');
   const [amount, setAmount] = useState('');
@@ -82,12 +98,13 @@ export default function App() {
   const openAdd = () => { resetForm(); setModalVisible(true); };
   const closeModal = () => { setModalVisible(false); resetForm(); };
 
-  const parsedAmount = parseFloat(amount);
-  const canSave = desc.trim() && parsedAmount > 0 && /^\d{4}-\d{2}-\d{2}$/.test(date);
+  const parsedAmount = parseAmount(amount);
+  const isoDate = normalizeDigits(date);
+  const canSave = desc.trim() && Number.isFinite(parsedAmount) && parsedAmount > 0 && /^\d{4}-\d{2}-\d{2}$/.test(isoDate);
 
   const addOrEditExpense = () => {
     if (!canSave) return;
-    const entry = { desc: desc.trim(), amount: parsedAmount, category, date };
+    const entry = { desc: desc.trim(), amount: parsedAmount, category, date: isoDate };
     if (editId !== null) {
       setExpenses(expenses.map(e => (e.id === editId ? { ...e, ...entry } : e)));
     } else {
@@ -110,8 +127,9 @@ export default function App() {
     setModalVisible(true);
   };
 
+  const isoFilterDate = normalizeDigits(filterDate);
   const filteredExpenses = expenses
-    .filter(exp => (filterCat === 'All' || exp.category === filterCat) && (!filterDate || exp.date === filterDate))
+    .filter(exp => (filterCat === 'All' || exp.category === filterCat) && (!isoFilterDate || exp.date === isoFilterDate))
     .sort((a, b) => b.date.localeCompare(a.date));
 
   const totalSpent = expenses.reduce((sum, e) => sum + e.amount, 0);
@@ -136,31 +154,39 @@ export default function App() {
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.eyebrow}>
-          {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
-        </Text>
-        <Text style={styles.title}>Expenses</Text>
+        <Text style={styles.eyebrow}>{fmt.longDate(new Date())}</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>{s.expenses}</Text>
+          <Pressable
+            onPress={() => setLangPickerVisible(true)}
+            style={styles.langBtn}
+            hitSlop={8}
+            accessibilityLabel={s.language}
+          >
+            <Text style={styles.langBtnText}>🌐 {lang.toUpperCase()}</Text>
+          </Pressable>
+        </View>
 
         <View style={styles.hero}>
-          <Text style={styles.heroLabel}>Total spent</Text>
-          <Text style={styles.heroAmount}>{formatMoney(totalSpent)}</Text>
+          <Text style={styles.heroLabel}>{s.totalSpent}</Text>
+          <Text style={styles.heroAmount}>{fmt.money(totalSpent)}</Text>
           <View style={styles.heroStats}>
             <View>
-              <Text style={styles.heroStatValue}>{expenses.length}</Text>
-              <Text style={styles.heroStatLabel}>Transactions</Text>
+              <Text style={styles.heroStatValue}>{fmt.number(expenses.length)}</Text>
+              <Text style={styles.heroStatLabel}>{s.transactions}</Text>
             </View>
             <View style={styles.heroDivider} />
             <View>
               <Text style={styles.heroStatValue}>
-                {formatMoney(expenses.length ? totalSpent / expenses.length : 0)}
+                {fmt.money(expenses.length ? totalSpent / expenses.length : 0)}
               </Text>
-              <Text style={styles.heroStatLabel}>Average</Text>
+              <Text style={styles.heroStatLabel}>{s.average}</Text>
             </View>
           </View>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Spending by category</Text>
+          <Text style={styles.cardTitle}>{s.spendingByCategory}</Text>
           {categoryTotals.length > 0 ? (
             <>
               <View style={styles.stackedBar}>
@@ -171,55 +197,60 @@ export default function App() {
               {categoryTotals.map(c => (
                 <View key={c.name} style={styles.breakdownRow}>
                   <View style={[styles.dot, { backgroundColor: c.color }]} />
-                  <Text style={styles.breakdownName}>{c.name}</Text>
-                  <Text style={styles.breakdownPct}>{Math.round((c.amount / totalSpent) * 100)}%</Text>
-                  <Text style={styles.breakdownAmount}>{formatMoney(c.amount)}</Text>
+                  <Text style={styles.breakdownName}>{s.categories[c.name]}</Text>
+                  <Text style={styles.breakdownPct}>{fmt.percent(c.amount / totalSpent)}</Text>
+                  <View style={styles.breakdownAmountBox}>
+                    <Text style={styles.breakdownAmount}>{fmt.money(c.amount)}</Text>
+                  </View>
                 </View>
               ))}
             </>
           ) : (
-            <Text style={styles.emptyText}>Add an expense to see your breakdown.</Text>
+            <Text style={styles.emptyText}>{s.emptyBreakdown}</Text>
           )}
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Trend</Text>
+          <Text style={styles.cardTitle}>{s.trend}</Text>
           {trendDates.length > 0 ? (
-            <LineChart
-              data={{ labels: trendDates.map(d => d.slice(5)), datasets: [{ data: trendData }] }}
-              width={contentWidth - 16}
-              height={180}
-              yAxisLabel="$"
-              withInnerLines={false}
-              withOuterLines={false}
-              chartConfig={{
-                backgroundGradientFrom: t.card,
-                backgroundGradientTo: t.card,
-                backgroundGradientFromOpacity: 0,
-                backgroundGradientToOpacity: 0,
-                fillShadowGradientFrom: t.primary,
-                fillShadowGradientFromOpacity: 0.25,
-                fillShadowGradientTo: t.primary,
-                fillShadowGradientToOpacity: 0,
-                decimalPlaces: 0,
-                color: () => t.primary,
-                labelColor: () => t.muted,
-                propsForDots: { r: '4', strokeWidth: '2', stroke: t.card },
-              }}
-              bezier
-              style={styles.chart}
-            />
+            // Time runs left to right even in RTL layouts.
+            <View style={styles.ltr}>
+              <LineChart
+                data={{ labels: trendDates.map(d => d.slice(5)), datasets: [{ data: trendData }] }}
+                width={contentWidth - 16}
+                height={180}
+                yAxisLabel={fmt.currencySymbol}
+                withInnerLines={false}
+                withOuterLines={false}
+                chartConfig={{
+                  backgroundGradientFrom: t.card,
+                  backgroundGradientTo: t.card,
+                  backgroundGradientFromOpacity: 0,
+                  backgroundGradientToOpacity: 0,
+                  fillShadowGradientFrom: t.primary,
+                  fillShadowGradientFromOpacity: 0.25,
+                  fillShadowGradientTo: t.primary,
+                  fillShadowGradientToOpacity: 0,
+                  decimalPlaces: 0,
+                  color: () => t.primary,
+                  labelColor: () => t.muted,
+                  propsForDots: { r: '4', strokeWidth: '2', stroke: t.card },
+                }}
+                bezier
+                style={styles.chart}
+              />
+            </View>
           ) : (
-            <Text style={styles.emptyText}>No trend data yet.</Text>
+            <Text style={styles.emptyText}>{s.noTrend}</Text>
           )}
         </View>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Transactions</Text>
+          <Text style={styles.sectionTitle}>{s.transactions}</Text>
           <View style={styles.dateFilter}>
             <TextInput
               style={styles.dateFilterInput}
-              placeholder="Filter date"
+              placeholder={s.filterDate}
               placeholderTextColor={t.muted}
               value={filterDate}
               onChangeText={setFilterDate}
@@ -242,7 +273,7 @@ export default function App() {
                 style={[styles.chip, active && styles.chipActive]}
               >
                 <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                  {categoryByName[name] ? `${categoryByName[name].icon}  ` : ''}{name}
+                  {categoryByName[name] ? `${categoryByName[name].icon}  ${s.categories[name]}` : s.all}
                 </Text>
               </Pressable>
             );
@@ -252,8 +283,8 @@ export default function App() {
         {filteredExpenses.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyEmoji}>🪙</Text>
-            <Text style={styles.emptyTitle}>No expenses found</Text>
-            <Text style={styles.emptyText}>Tap + to add your first one.</Text>
+            <Text style={styles.emptyTitle}>{s.noExpenses}</Text>
+            <Text style={styles.emptyText}>{s.tapToAdd}</Text>
           </View>
         ) : (
           <View style={styles.listCard}>
@@ -274,9 +305,9 @@ export default function App() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.expenseDesc} numberOfLines={1}>{item.desc}</Text>
-                    <Text style={styles.expenseMeta}>{item.category} · {item.date}</Text>
+                    <Text style={styles.expenseMeta}>{s.categories[item.category]} · {item.date}</Text>
                   </View>
-                  <Text style={styles.expenseAmount}>-{formatMoney(item.amount)}</Text>
+                  <Text style={styles.expenseAmount}>{fmt.money(-item.amount)}</Text>
                 </Pressable>
               );
             })}
@@ -287,7 +318,7 @@ export default function App() {
       <Pressable
         onPress={openAdd}
         style={({ pressed }) => [styles.fab, pressed && { transform: [{ scale: 0.94 }] }]}
-        accessibilityLabel="Add expense"
+        accessibilityLabel={s.addExpense}
       >
         <Text style={styles.fabText}>+</Text>
       </Pressable>
@@ -300,10 +331,10 @@ export default function App() {
           <Pressable style={StyleSheet.absoluteFill} onPress={closeModal} />
           <View style={styles.sheet}>
             <View style={styles.sheetHandle} />
-            <Text style={styles.modalTitle}>{editId !== null ? 'Edit expense' : 'New expense'}</Text>
+            <Text style={styles.modalTitle}>{editId !== null ? s.editExpense : s.newExpense}</Text>
 
             <View style={styles.amountRow}>
-              <Text style={styles.amountCurrency}>$</Text>
+              <Text style={styles.amountCurrency}>{fmt.currencySymbol}</Text>
               <TextInput
                 style={styles.amountInput}
                 placeholder="0.00"
@@ -315,16 +346,16 @@ export default function App() {
               />
             </View>
 
-            <Text style={styles.fieldLabel}>Description</Text>
+            <Text style={styles.fieldLabel}>{s.description}</Text>
             <TextInput
               style={styles.input}
-              placeholder="e.g. Lunch with friends"
+              placeholder={s.descPlaceholder}
               placeholderTextColor={t.muted}
               value={desc}
               onChangeText={setDesc}
             />
 
-            <Text style={styles.fieldLabel}>Date</Text>
+            <Text style={styles.fieldLabel}>{s.date}</Text>
             <TextInput
               style={styles.input}
               placeholder="YYYY-MM-DD"
@@ -333,7 +364,7 @@ export default function App() {
               onChangeText={setDate}
             />
 
-            <Text style={styles.fieldLabel}>Category</Text>
+            <Text style={styles.fieldLabel}>{s.category}</Text>
             <View style={styles.catGrid}>
               {categories.map(cat => {
                 const active = category === cat.name;
@@ -347,7 +378,7 @@ export default function App() {
                     ]}
                   >
                     <Text style={styles.catTileIcon}>{cat.icon}</Text>
-                    <Text style={[styles.catTileText, active && { color: cat.color }]}>{cat.name}</Text>
+                    <Text style={[styles.catTileText, active && { color: cat.color }]}>{s.categories[cat.name]}</Text>
                   </Pressable>
                 );
               })}
@@ -358,19 +389,49 @@ export default function App() {
               disabled={!canSave}
               style={[styles.primaryBtn, !canSave && { opacity: 0.4 }]}
             >
-              <Text style={styles.primaryBtnText}>{editId !== null ? 'Save changes' : 'Add expense'}</Text>
+              <Text style={styles.primaryBtnText}>{editId !== null ? s.saveChanges : s.addExpense}</Text>
             </Pressable>
             {editId !== null ? (
               <Pressable onPress={deleteExpense} style={styles.ghostBtn}>
-                <Text style={[styles.ghostBtnText, { color: t.danger }]}>Delete expense</Text>
+                <Text style={[styles.ghostBtnText, { color: t.danger }]}>{s.deleteExpense}</Text>
               </Pressable>
             ) : (
               <Pressable onPress={closeModal} style={styles.ghostBtn}>
-                <Text style={styles.ghostBtnText}>Cancel</Text>
+                <Text style={styles.ghostBtnText}>{s.cancel}</Text>
               </Pressable>
             )}
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal
+        visible={langPickerVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setLangPickerVisible(false)}
+      >
+        <View style={styles.modalBg}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setLangPickerVisible(false)} />
+          <View style={styles.sheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.modalTitle}>{s.language}</Text>
+            <ScrollView style={styles.langList}>
+              {languages.map((l, i) => {
+                const active = l.code === lang;
+                return (
+                  <Pressable
+                    key={l.code}
+                    onPress={() => { setLang(l.code); setLangPickerVisible(false); }}
+                    style={[styles.langRow, i > 0 && styles.expenseItemBorder]}
+                  >
+                    <Text style={[styles.langName, active && styles.langNameActive]}>{l.name}</Text>
+                    {active ? <Text style={styles.langCheck}>✓</Text> : null}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
       </Modal>
 
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
@@ -378,11 +439,15 @@ export default function App() {
   );
 }
 
-const makeStyles = t => StyleSheet.create({
-  screen: { flex: 1, backgroundColor: t.bg },
+const makeStyles = (t, { rtl, letterSpacing }) => StyleSheet.create({
+  screen: { flex: 1, backgroundColor: t.bg, direction: rtl ? 'rtl' : 'ltr' },
+  ltr: { direction: 'ltr' },
   container: { paddingTop: 64, paddingHorizontal: 20, paddingBottom: 120, width: '100%', maxWidth: 640, alignSelf: 'center' },
-  eyebrow: { color: t.muted, fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8 },
-  title: { color: t.text, fontSize: 34, fontWeight: '800', letterSpacing: -0.5, marginTop: 2, marginBottom: 20 },
+  eyebrow: { color: t.muted, fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: letterSpacing ? 0.8 : 0 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2, marginBottom: 20 },
+  title: { color: t.text, fontSize: 34, fontWeight: '800', letterSpacing: letterSpacing ? -0.5 : 0, flexShrink: 1 },
+  langBtn: { backgroundColor: t.chip, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, marginStart: 12 },
+  langBtnText: { color: t.text, fontSize: 13, fontWeight: '700' },
 
   hero: {
     backgroundColor: t.hero,
@@ -406,17 +471,19 @@ const makeStyles = t => StyleSheet.create({
   cardTitle: { color: t.text, fontSize: 16, fontWeight: '700', marginBottom: 14 },
   stackedBar: { flexDirection: 'row', height: 10, borderRadius: 5, overflow: 'hidden', marginBottom: 14, gap: 2 },
   breakdownRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 7 },
-  dot: { width: 10, height: 10, borderRadius: 5, marginRight: 10 },
+  dot: { width: 10, height: 10, borderRadius: 5, marginEnd: 10 },
   breakdownName: { color: t.text, fontSize: 15, flex: 1 },
-  breakdownPct: { color: t.muted, fontSize: 13, marginRight: 12 },
-  breakdownAmount: { color: t.text, fontSize: 15, fontWeight: '600', minWidth: 80, textAlign: 'right' },
+  breakdownPct: { color: t.muted, fontSize: 13, marginEnd: 12 },
+  // Aligns amounts to the trailing edge in both LTR and RTL.
+  breakdownAmountBox: { minWidth: 80, alignItems: 'flex-end' },
+  breakdownAmount: { color: t.text, fontSize: 15, fontWeight: '600' },
   chart: { marginLeft: -16, marginBottom: -8 },
 
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, marginBottom: 12 },
   sectionTitle: { color: t.text, fontSize: 20, fontWeight: '700' },
   dateFilter: { flexDirection: 'row', alignItems: 'center', backgroundColor: t.chip, borderRadius: 12, paddingHorizontal: 12 },
-  dateFilterInput: { color: t.text, paddingVertical: 8, width: 104, fontSize: 14 },
-  clearIcon: { color: t.muted, fontSize: 13, paddingLeft: 6 },
+  dateFilterInput: { color: t.text, paddingVertical: 8, width: 120, fontSize: 14 },
+  clearIcon: { color: t.muted, fontSize: 13, paddingStart: 6 },
 
   chipRow: { gap: 8, paddingBottom: 14 },
   chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: t.chip },
@@ -440,7 +507,7 @@ const makeStyles = t => StyleSheet.create({
 
   fab: {
     position: 'absolute',
-    right: 24,
+    end: 24,
     bottom: 36,
     width: 60,
     height: 60,
@@ -456,7 +523,8 @@ const makeStyles = t => StyleSheet.create({
   },
   fabText: { color: '#fff', fontSize: 32, fontWeight: '400', marginTop: -2 },
 
-  modalBg: { flex: 1, justifyContent: 'flex-end', backgroundColor: t.overlay },
+  // Modals render in their own native root, so direction must be set again here.
+  modalBg: { flex: 1, justifyContent: 'flex-end', backgroundColor: t.overlay, direction: rtl ? 'rtl' : 'ltr' },
   sheet: {
     backgroundColor: t.card,
     borderTopLeftRadius: 28,
@@ -471,7 +539,7 @@ const makeStyles = t => StyleSheet.create({
   sheetHandle: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: t.border, marginBottom: 16 },
   modalTitle: { color: t.text, fontSize: 20, fontWeight: '700', textAlign: 'center' },
   amountRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginVertical: 20 },
-  amountCurrency: { color: t.muted, fontSize: 32, fontWeight: '600', marginRight: 4 },
+  amountCurrency: { color: t.muted, fontSize: 32, fontWeight: '600', marginEnd: 4 },
   amountInput: { color: t.text, fontSize: 44, fontWeight: '800', minWidth: 120, textAlign: 'center', padding: 0 },
   fieldLabel: { color: t.muted, fontSize: 13, fontWeight: '600', marginBottom: 6, marginTop: 4 },
   input: {
@@ -500,4 +568,10 @@ const makeStyles = t => StyleSheet.create({
   primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   ghostBtn: { paddingVertical: 14, alignItems: 'center' },
   ghostBtnText: { color: t.muted, fontSize: 15, fontWeight: '600' },
+
+  langList: { maxHeight: 420, marginTop: 16 },
+  langRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14 },
+  langName: { color: t.text, fontSize: 16, fontWeight: '600' },
+  langNameActive: { color: t.primary },
+  langCheck: { color: t.primary, fontSize: 16, fontWeight: '700' },
 });
