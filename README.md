@@ -7,6 +7,8 @@ A cross-platform mobile expense tracker built with React Native (Expo).
 - Categorize expenses and filter by date/category
 - Analytics dashboard: pie chart (by category), line chart (trend over time), total spent
 - Mobile-friendly UI
+- 13 languages (English, Chinese, Hindi, Spanish, Arabic, French, Bengali, Portuguese, Russian, Urdu, Indonesian, German, Japanese) with right-to-left layout for Arabic and Urdu; follows the device language, switchable from the 🌐 button
+- Currency, numbers and dates formatted for the selected language, with currency taken from the device region
 - GitHub Actions pipeline for iOS and Android builds
 
 ## Getting Started
