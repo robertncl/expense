@@ -98,7 +98,7 @@ export default function App() {
   const openAdd = () => { resetForm(); setModalVisible(true); };
   const closeModal = () => { setModalVisible(false); resetForm(); };
 
-  const parsedAmount = parseAmount(amount);
+  const parsedAmount = parseAmount(amount, fmt.decimal);
   const isoDate = normalizeDigits(date);
   const canSave = desc.trim() && Number.isFinite(parsedAmount) && parsedAmount > 0 && /^\d{4}-\d{2}-\d{2}$/.test(isoDate);
 
@@ -120,7 +120,7 @@ export default function App() {
 
   const startEdit = exp => {
     setDesc(exp.desc);
-    setAmount(exp.amount.toString());
+    setAmount(fmt.amountInput(exp.amount));
     setCategory(exp.category);
     setDate(exp.date);
     setEditId(exp.id);

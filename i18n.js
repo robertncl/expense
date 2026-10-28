@@ -1,4 +1,7 @@
 import { getLocales } from 'expo-localization';
+import { amountInput } from './amount';
+
+export { normalizeDigits, parseAmount } from './amount';
 
 export const languages = [
   { code: 'en', name: 'English' },
@@ -373,26 +376,16 @@ export const makeFormatters = lang => {
   const money = new Intl.NumberFormat(lang, { style: 'currency', currency });
   const number = new Intl.NumberFormat(lang);
   const percent = new Intl.NumberFormat(lang, { style: 'percent' });
-  let symbol = currency;
-  try {
-    symbol = money.formatToParts(0).find(p => p.type === 'currency')?.value ?? currency;
-  } catch {}
+  const input = amountInput(lang);
+  // Engines without formatToParts fall back to the ISO code as the symbol.
+  const symbol = money.formatToParts?.(0).find(p => p.type === 'currency')?.value ?? currency;
   return {
     money: n => money.format(n),
     number: n => number.format(n),
     percent: n => percent.format(n),
     currencySymbol: symbol,
+    decimal: input.decimal,
+    amountInput: input.format,
     longDate: d => d.toLocaleDateString(lang, { weekday: 'long', month: 'long', day: 'numeric' }),
   };
 };
-
-// Map Arabic-Indic, Extended Arabic-Indic (Urdu), Devanagari and Bengali digits to ASCII.
-const digitZeros = [0x0660, 0x06f0, 0x0966, 0x09e6];
-export const normalizeDigits = str =>
-  str.replace(/[٠-٩۰-۹०-९০-৯]/g, ch => {
-    const code = ch.charCodeAt(0);
-    return String(code - digitZeros.find(z => code >= z && code <= z + 9));
-  });
-
-// Accept comma and Arabic decimal separators, as typed on many locale keyboards.
-export const parseAmount = str => parseFloat(normalizeDigits(str).replace(/[,٫]/g, '.'));

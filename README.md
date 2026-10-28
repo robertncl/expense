@@ -24,11 +24,17 @@ npm install
 - For Web: `npm run web`
 - Or start the Expo dev server: `npm start`
 
+### Run tests
+```bash
+npm test
+```
+
 ### Project Structure
 ```
 assets/           # App icons and images
 .github/workflows/ # CI pipeline for Expo builds
 App.js            # Main app code
+amount.js         # Amount parsing (tested by amount.test.mjs)
 app.json          # Expo app config
 index.js          # Entry point
 package.json      # Dependencies and scripts

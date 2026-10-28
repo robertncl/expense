@@ -29,6 +29,9 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
+      - name: Run tests
+        run: npm test
+
       - name: Set up EAS CLI
         uses: expo/expo-github-action@9da89d3617bb88139671bad31b09c65714c2ee06 # 9.0.1
         with:
