@@ -13,7 +13,15 @@ import {
   KeyboardAvoidingView,
   Platform,
   useColorScheme,
+  useWindowDimensions,
 } from 'react-native';
+import { useFonts } from 'expo-font';
+// Per-weight imports, so only the five weights in use are bundled.
+import { Archivo_400Regular } from '@expo-google-fonts/archivo/400Regular';
+import { Archivo_500Medium } from '@expo-google-fonts/archivo/500Medium';
+import { Archivo_600SemiBold } from '@expo-google-fonts/archivo/600SemiBold';
+import { Archivo_700Bold } from '@expo-google-fonts/archivo/700Bold';
+import { Archivo_800ExtraBold } from '@expo-google-fonts/archivo/800ExtraBold';
 import {
   languages,
   languageByCode,
@@ -34,6 +42,8 @@ import OverviewView from './OverviewView';
 import HistoryView from './HistoryView';
 import SubscriptionsView from './SubscriptionsView';
 import SubscriptionSheet from './SubscriptionSheet';
+import { CategoryPicker, PrimaryButton, SheetHeader } from './controls';
+import { CheckIcon, GlobeIcon, PlusIcon } from './icons';
 
 // Keep the splash screen up until saved data has loaded.
 SplashScreen.preventAutoHideAsync();
@@ -43,6 +53,18 @@ const tabs = ['overview', 'history', 'subscriptions'];
 export default function App() {
   const scheme = useColorScheme();
   const t = themes[scheme === 'dark' ? 'dark' : 'light'];
+  const { width } = useWindowDimensions();
+  // Wide screens (tablets, desktop web) get the header action and two-column sections.
+  const wide = width >= 900;
+  const [fontsLoaded, fontError] = useFonts({
+    Archivo_400Regular,
+    Archivo_500Medium,
+    Archivo_600SemiBold,
+    Archivo_700Bold,
+    Archivo_800ExtraBold,
+  });
+  // A font that fails to load falls back to the system face rather than blocking the app.
+  const fontsSettled = fontsLoaded || !!fontError;
   const [lang, setLang] = useState(detectLanguage);
   // The language the user picked, saved so it survives restarts; null follows the device.
   const [pickedLang, setPickedLang] = useState(null);
@@ -50,10 +72,10 @@ export default function App() {
   const s = useMemo(() => ({ ...strings.en, ...strings[lang] }), [lang]);
   const fmt = useMemo(() => makeFormatters(lang), [lang]);
   const styles = useMemo(
-    () => makeStyles(t, { rtl, letterSpacing: allowsLetterSpacing(lang) }),
-    [t, rtl, lang],
+    () => makeStyles(t, { rtl, letterSpacing: allowsLetterSpacing(lang), wide, fonts: fontsLoaded }),
+    [t, rtl, lang, wide, fontsLoaded],
   );
-  const ui = useMemo(() => ({ s, fmt, styles, t }), [s, fmt, styles, t]);
+  const ui = useMemo(() => ({ s, fmt, styles, t, wide }), [s, fmt, styles, t, wide]);
 
   const [loaded, setLoaded] = useState(false);
   const writable = useRef(false);
@@ -80,9 +102,12 @@ export default function App() {
         setPickedLang(data.lang);
       }
       setLoaded(true);
-      SplashScreen.hideAsync();
     });
   }, []);
+
+  useEffect(() => {
+    if (loaded && fontsSettled) SplashScreen.hideAsync();
+  }, [loaded, fontsSettled]);
 
   useEffect(() => {
     if (!loaded || !writable.current) return;
@@ -167,24 +192,44 @@ export default function App() {
     closeSubscription();
   };
 
-  if (!loaded) return null;
+
+  if (!loaded || !fontsSettled) return null;
 
   const onSubscriptionsTab = tab === 'subscriptions';
+  const addLabel = onSubscriptionsTab ? s.addSubscription : s.addExpense;
+  const onAdd = onSubscriptionsTab ? () => openSubscription(null) : openAdd;
 
   return (
     <View style={styles.screen}>
+      <View style={styles.topBar} />
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.eyebrow}>{fmt.longDate(new Date())}</Text>
-        <View style={styles.titleRow}>
-          <Text style={styles.title}>{s.expenses}</Text>
-          <Pressable
-            onPress={() => setLangPickerVisible(true)}
-            style={styles.langBtn}
-            hitSlop={8}
-            accessibilityLabel={s.language}
-          >
-            <Text style={styles.langBtnText}>🌐 {lang.toUpperCase()}</Text>
-          </Pressable>
+        <View style={styles.header}>
+          <View style={styles.headerTitleBox}>
+            {wide ? <Text style={styles.title} accessibilityRole="header">{s.expenses}</Text> : null}
+            <Text style={styles.eyebrow}>{fmt.longDate(new Date())}</Text>
+            {wide ? null : <Text style={styles.title} accessibilityRole="header">{s.expenses}</Text>}
+          </View>
+          <View style={styles.headerActions}>
+            <Pressable
+              onPress={() => setLangPickerVisible(true)}
+              style={styles.langBtn}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={`${s.language}: ${languageByCode[lang].name}`}
+            >
+              <GlobeIcon color={t.ink} />
+              <Text style={styles.langBtnText}>{wide ? languageByCode[lang].name : lang.toUpperCase()}</Text>
+            </Pressable>
+            {wide ? (
+              <PrimaryButton
+                label={addLabel}
+                onPress={onAdd}
+                icon={<PlusIcon color={t.onBlue} />}
+                style={styles.primaryBtnHeader}
+                ui={ui}
+              />
+            ) : null}
+          </View>
         </View>
 
         <View style={styles.tabs} accessibilityRole="tablist">
@@ -206,7 +251,9 @@ export default function App() {
           })}
         </View>
 
-        {tab === 'overview' && <OverviewView expenses={expenses} onEdit={startEdit} ui={ui} />}
+        {tab === 'overview' && (
+          <OverviewView expenses={expenses} onEdit={startEdit} ui={ui} />
+        )}
         {tab === 'history' && (
           <HistoryView expenses={expenses} subscriptions={subscriptions} today={today} ui={ui} />
         )}
@@ -215,91 +262,71 @@ export default function App() {
         )}
       </ScrollView>
 
-      <Pressable
-        onPress={onSubscriptionsTab ? () => openSubscription(null) : openAdd}
-        style={({ pressed }) => [styles.fab, pressed && { transform: [{ scale: 0.94 }] }]}
-        accessibilityLabel={onSubscriptionsTab ? s.addSubscription : s.addExpense}
-      >
-        <Text style={styles.fabText}>+</Text>
-      </Pressable>
+      {wide ? null : (
+        <View style={styles.bottomBar}>
+          <PrimaryButton label={addLabel} onPress={onAdd} icon={<PlusIcon color={t.onBlue} />} ui={ui} />
+        </View>
+      )}
 
       <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={closeModal}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalBg}
         >
-          <Pressable style={StyleSheet.absoluteFill} onPress={closeModal} />
-          <View style={styles.sheet}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.modalTitle}>{editId !== null ? s.editExpense : s.newExpense}</Text>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeModal} accessibilityLabel={s.cancel} />
+          <View style={[styles.sheet, styles.sheetTall]}>
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              <SheetHeader title={editId !== null ? s.editExpense : s.newExpense} onClose={closeModal} ui={ui} />
 
-            <View style={styles.amountRow}>
-              <Text style={styles.amountCurrency}>{fmt.currencySymbol}</Text>
+              <View style={styles.amountRow}>
+                <Text style={styles.amountCurrency}>{fmt.currencySymbol}</Text>
+                <TextInput
+                  style={styles.amountInput}
+                  placeholder="0.00"
+                  placeholderTextColor={t.ink3}
+                  value={amount}
+                  onChangeText={setAmount}
+                  keyboardType="decimal-pad"
+                  autoFocus={editId === null}
+                />
+              </View>
+
+              <Text style={styles.fieldLabel}>{s.description}</Text>
               <TextInput
-                style={styles.amountInput}
-                placeholder="0.00"
-                placeholderTextColor={t.muted}
-                value={amount}
-                onChangeText={setAmount}
-                keyboardType="decimal-pad"
-                autoFocus={editId === null}
+                style={styles.input}
+                placeholder={s.descPlaceholder}
+                placeholderTextColor={t.ink3}
+                value={desc}
+                onChangeText={setDesc}
               />
-            </View>
 
-            <Text style={styles.fieldLabel}>{s.description}</Text>
-            <TextInput
-              style={styles.input}
-              placeholder={s.descPlaceholder}
-              placeholderTextColor={t.muted}
-              value={desc}
-              onChangeText={setDesc}
-            />
+              <Text style={styles.fieldLabel}>{s.date}</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={t.ink3}
+                value={date}
+                onChangeText={setDate}
+              />
 
-            <Text style={styles.fieldLabel}>{s.date}</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={t.muted}
-              value={date}
-              onChangeText={setDate}
-            />
+              <CategoryPicker value={category} onChange={setCategory} ui={ui} />
 
-            <Text style={styles.fieldLabel}>{s.category}</Text>
-            <View style={styles.catGrid}>
-              {categories.map(cat => {
-                const active = category === cat.name;
-                return (
-                  <Pressable
-                    key={cat.name}
-                    onPress={() => setCategory(cat.name)}
-                    style={[
-                      styles.catTile,
-                      active && { borderColor: cat.color, backgroundColor: cat.color + '1A' },
-                    ]}
-                  >
-                    <Text style={styles.catTileIcon}>{cat.icon}</Text>
-                    <Text style={[styles.catTileText, active && { color: cat.color }]}>{s.categories[cat.name]}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            <Pressable
-              onPress={addOrEditExpense}
-              disabled={!canSave}
-              style={[styles.primaryBtn, !canSave && { opacity: 0.4 }]}
-            >
-              <Text style={styles.primaryBtnText}>{editId !== null ? s.saveChanges : s.addExpense}</Text>
-            </Pressable>
-            {editId !== null ? (
-              <Pressable onPress={deleteExpense} style={styles.ghostBtn}>
-                <Text style={[styles.ghostBtnText, { color: t.danger }]}>{s.deleteExpense}</Text>
-              </Pressable>
-            ) : (
-              <Pressable onPress={closeModal} style={styles.ghostBtn}>
-                <Text style={styles.ghostBtnText}>{s.cancel}</Text>
-              </Pressable>
-            )}
+              <View style={styles.sheetActions}>
+                <PrimaryButton
+                  label={editId !== null ? s.saveChanges : s.addExpense}
+                  onPress={addOrEditExpense}
+                  disabled={!canSave}
+                  ui={ui}
+                />
+                {editId !== null ? (
+                  <View style={styles.sheetSecondary}>
+                    <Pressable onPress={deleteExpense} style={styles.textBtn} accessibilityRole="button">
+                      <Text style={styles.dangerBtnText}>{s.deleteExpense}</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </View>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -322,21 +349,26 @@ export default function App() {
         onRequestClose={() => setLangPickerVisible(false)}
       >
         <View style={styles.modalBg}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setLangPickerVisible(false)} />
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setLangPickerVisible(false)}
+            accessibilityLabel={s.cancel}
+          />
           <View style={styles.sheet}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.modalTitle}>{s.language}</Text>
+            <SheetHeader title={s.language} onClose={() => setLangPickerVisible(false)} ui={ui} />
             <ScrollView style={styles.langList}>
-              {languages.map((l, i) => {
+              {languages.map(l => {
                 const active = l.code === lang;
                 return (
                   <Pressable
                     key={l.code}
                     onPress={() => { setLang(l.code); setPickedLang(l.code); setLangPickerVisible(false); }}
-                    style={[styles.langRow, i > 0 && styles.expenseItemBorder]}
+                    style={[styles.langRow, active && styles.langRowActive]}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: active }}
                   >
                     <Text style={[styles.langName, active && styles.langNameActive]}>{l.name}</Text>
-                    {active ? <Text style={styles.langCheck}>✓</Text> : null}
+                    {active ? <CheckIcon color={t.blue} /> : null}
                   </Pressable>
                 );
               })}

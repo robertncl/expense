@@ -2,12 +2,13 @@
 import { isISODate } from './dates.js';
 import { cycles } from './subscriptions.js';
 
+// Shown by name only; theme.js gives each a shade for charts.
 export const categories = [
-  { name: 'Food', icon: '🍔', color: '#F97316' },
-  { name: 'Transport', icon: '🚗', color: '#3B82F6' },
-  { name: 'Shopping', icon: '🛍️', color: '#EC4899' },
-  { name: 'Bills', icon: '🧾', color: '#10B981' },
-  { name: 'Other', icon: '✨', color: '#8B5CF6' },
+  { name: 'Food' },
+  { name: 'Transport' },
+  { name: 'Shopping' },
+  { name: 'Bills' },
+  { name: 'Other' },
 ];
 export const categoryByName = Object.fromEntries(categories.map(c => [c.name, c]));
 

@@ -1,63 +1,56 @@
 import React from 'react';
 import { Text, View, Pressable } from 'react-native';
-import { categoryByName } from './model';
+import { addDays } from './dates';
 import { monthlyCost, nextCharge } from './subscriptions';
+import { Stat } from './controls';
 
 export default function SubscriptionsView({ subscriptions, today, onEdit, ui: { s, fmt, styles } }) {
   const monthly = subscriptions.reduce((sum, sub) => sum + monthlyCost(sub), 0);
   const upcoming = subscriptions
     .map(sub => ({ sub, next: nextCharge(sub, today) }))
     .sort((a, b) => a.next.localeCompare(b.next));
+  // Charges in the next two days are marked in blue.
+  const soon = addDays(today, 2);
 
   return (
     <>
       <View style={styles.hero}>
-        <Text style={styles.heroLabel}>{s.monthlyCost}</Text>
-        <Text style={styles.heroAmount}>{fmt.money(monthly)}</Text>
-        <View style={styles.heroStats}>
-          <View>
-            <Text style={styles.heroStatValue}>{fmt.number(subscriptions.length)}</Text>
-            <Text style={styles.heroStatLabel}>{s.activeSubscriptions}</Text>
-          </View>
-          <View style={styles.heroDivider} />
-          <View>
-            <Text style={styles.heroStatValue}>{fmt.money(monthly * 12)}</Text>
-            <Text style={styles.heroStatLabel}>{s.perYear}</Text>
-          </View>
+        <View style={styles.heroMain}>
+          <Text style={styles.heroLabel}>{s.monthlyCost}</Text>
+          <Text style={styles.figure} adjustsFontSizeToFit numberOfLines={1}>{fmt.money(monthly)}</Text>
+        </View>
+        <View style={styles.stats}>
+          <Stat styles={styles} label={s.activeSubscriptions} value={fmt.number(subscriptions.length)} />
+          <Stat styles={styles} label={s.perYear} value={fmt.money(monthly * 12)} />
         </View>
       </View>
 
-      {upcoming.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyEmoji}>🔁</Text>
-          <Text style={styles.emptyTitle}>{s.noSubscriptions}</Text>
-          <Text style={styles.emptyText}>{s.tapToAddSubscription}</Text>
-        </View>
-      ) : (
-        <>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{s.upcomingCharges}</Text>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle} accessibilityRole="header">{s.upcomingCharges}</Text>
+        {upcoming.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>{s.noSubscriptions}</Text>
+            <Text style={styles.emptyText}>{s.tapToAddSubscription}</Text>
           </View>
-          <View style={styles.listCard}>
-            {upcoming.map(({ sub, next }, i) => {
-              const cat = categoryByName[sub.category];
+        ) : (
+          <View style={styles.list}>
+            {upcoming.map(({ sub, next }) => {
+              const isSoon = next <= soon;
               return (
                 <Pressable
                   key={sub.id}
                   onPress={() => onEdit(sub)}
-                  style={({ pressed }) => [
-                    styles.expenseItem,
-                    i > 0 && styles.expenseItemBorder,
-                    pressed && { opacity: 0.6 },
-                  ]}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [styles.expenseItem, pressed && styles.expenseItemPressed]}
                 >
-                  <View style={[styles.iconBubble, { backgroundColor: cat.color + '22' }]}>
-                    <Text style={styles.iconText}>{cat.icon}</Text>
+                  <View style={styles.dateBox}>
+                    <Text style={[styles.dateBoxDay, isSoon && styles.dateBoxSoon]}>{fmt.weekday(next)}</Text>
+                    <Text style={[styles.dateBoxNum, isSoon && styles.dateBoxSoon]}>{fmt.day(next)}</Text>
                   </View>
-                  <View style={{ flex: 1 }}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={styles.expenseDesc} numberOfLines={1}>{sub.name}</Text>
                     <Text style={styles.expenseMeta}>
-                      {s.cycles[sub.cycle]} · {s.nextCharge} {fmt.shortDate(next)}
+                      {s.categories[sub.category]} · {s.cycles[sub.cycle]} · {s.nextCharge} {fmt.shortDate(next)}
                     </Text>
                   </View>
                   <Text style={styles.expenseAmount}>{fmt.money(sub.amount)}</Text>
@@ -65,8 +58,8 @@ export default function SubscriptionsView({ subscriptions, today, onEdit, ui: { 
               );
             })}
           </View>
-        </>
-      )}
+        )}
+      </View>
     </>
   );
 }
