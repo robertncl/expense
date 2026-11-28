@@ -833,6 +833,7 @@ export const makeFormatters = lang => {
   const money = new Intl.NumberFormat(lang, { style: 'currency', currency });
   const number = new Intl.NumberFormat(lang);
   const percent = new Intl.NumberFormat(lang, { style: 'percent' });
+  const signedPercent = new Intl.NumberFormat(lang, { style: 'percent', signDisplay: 'exceptZero' });
   const input = amountInput(lang);
   // Engines without formatToParts fall back to the ISO code as the symbol.
   const symbol = money.formatToParts?.(0).find(p => p.type === 'currency')?.value ?? currency;
@@ -840,11 +841,15 @@ export const makeFormatters = lang => {
     money: n => money.format(n),
     number: n => number.format(n),
     percent: n => percent.format(n),
+    signedPercent: n => signedPercent.format(n),
     currencySymbol: symbol,
     decimal: input.decimal,
     amountInput: input.format,
     longDate: d => d.toLocaleDateString(lang, { weekday: 'long', month: 'long', day: 'numeric' }),
     shortDate: iso => toLocalDate(iso).toLocaleDateString(lang, { month: 'short', day: 'numeric' }),
+    rowDate: iso => toLocalDate(iso).toLocaleDateString(lang, { weekday: 'short', month: 'short', day: 'numeric' }),
+    weekday: iso => toLocalDate(iso).toLocaleDateString(lang, { weekday: 'short' }),
+    day: iso => toLocalDate(iso).toLocaleDateString(lang, { day: 'numeric' }),
     shortMonth: ym => toLocalDate(`${ym}-15`).toLocaleDateString(lang, { month: 'short' }),
     monthYear: ym => toLocalDate(`${ym}-15`).toLocaleDateString(lang, { month: 'long', year: 'numeric' }),
   };
